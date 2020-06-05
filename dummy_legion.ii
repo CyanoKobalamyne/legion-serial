@@ -1,0 +1,20 @@
+#include "dummy_legion.hh"
+
+/* Template definitions that must be in the header. */
+
+namespace Legion {
+
+template <typename T, T (*)(const Task*, const std::vector<PhysicalRegion>&,
+                            Context, Runtime*)>
+VariantID Runtime::preregister_task_variant(
+    const TaskVariantRegistrar& registrar, const char* task_name) {
+    return 0;
+}
+template <void (*)(const Task*, const std::vector<PhysicalRegion>&, Context,
+                   Runtime*)>
+VariantID Runtime::preregister_task_variant(
+    const TaskVariantRegistrar& registrar, const char* task_name) {
+    return 0;
+}
+
+}  // namespace Legion

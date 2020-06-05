@@ -27,43 +27,52 @@ typedef ::legion_coherence_property_t CoherenceProperty;
 
 /* Geometric types. */
 
-template <unsigned int DIM>
-class Point {};
-template <>
-class Point<1> {
+template <unsigned int DIM, typename T = int>
+class Point {
 public:
-    Point(int p);
-};
-template <>
-class Point<2> {
-public:
-    Point(int p1, int p2);
+    std::vector<T> coords;
+
+    Point(T p);
+    Point(T p1, T p2);
+
+    template <unsigned int DIM2, typename T2 = int>
+    bool operator==(const Point<DIM2, T2>& other);
+    T& operator[](unsigned int ix);
 };
 class DomainPoint {
 public:
+    std::vector<coord_t> coords;
+
     template <unsigned int DIM>
     DomainPoint(const Point<DIM>& rhs);
-    DomainPoint(coord_t index);
+    DomainPoint(coord_t coord);
 };
 
-template <unsigned int DIM>
+template <unsigned int DIM, typename T = int>
 class Rect {
 public:
-    Rect(Point<DIM> lo, Point<DIM> hi);
+    Point<DIM, T> lo, hi;
+
+    Rect(Point<DIM, T> lo_, Point<DIM, T> hi_);
 };
 class Domain {
 public:
-    template <unsigned int DIM>
-    Domain(const Rect<DIM>& other);
+    DomainPoint lo, hi;
+
+    template <unsigned int DIM, typename T = int>
+    Domain(const Rect<DIM, T>& other);
 };
 
-template <unsigned int DIM>
+template <unsigned int DIM, typename T = int>
 class PointInRectIterator {
 public:
-    PointInRectIterator(const Rect<DIM>& r, bool column_major_order = true);
+    Point<DIM, T> start, cur, end;
+    bool col_major;
+
+    PointInRectIterator(const Rect<DIM, T>& r, bool column_major_order = true);
     bool operator()(void) const;
-    Point<DIM> operator*(void)const;
-    PointInRectIterator<DIM> operator++(int);
+    Point<DIM, T> operator*(void)const;
+    PointInRectIterator<DIM, T> operator++(int);
 };
 
 /* Memory structures. */
@@ -190,5 +199,7 @@ public:
         const TaskVariantRegistrar& registrar, const char* task_name = NULL);
 };
 }  // namespace Legion
+
+#include "dummy_legion.ii"
 
 #endif  // LEGION_HH_
