@@ -2,6 +2,7 @@
 #define LEGION_HH_
 
 #include <cstddef>
+#include <map>
 #include <vector>
 
 enum legion_privilege_mode_t {
@@ -77,42 +78,71 @@ public:
 
 /* Memory structures. */
 
-class IndexSpace {};
+class IndexSpace {
+public:
+    Domain dom;
+};
 template <unsigned int DIM>
 class IndexSpaceT : public IndexSpace {
 public:
+    Rect<DIM> rect;
+
     IndexSpaceT(const IndexSpace& rhs);
 };
 class IndexPartition {};
 
-class FieldSpace {};
+class FieldSpace {
+public:
+    std::map<FieldID, size_t> fields;
+};
 class FieldAllocator {
 public:
+    FieldSpace space;
+
     FieldID allocate_field(size_t field_size, FieldID desired_fieldid);
 };
 
-class LogicalRegion {};
+class LogicalRegion {
+public:
+    IndexSpace ispace;
+    FieldSpace fspace;
+};
 template <unsigned int DIM>
 class LogicalRegionT : public LogicalRegion {
 public:
+    IndexSpaceT<DIM> ispace;
+    FieldSpace fspace;
+
     LogicalRegionT(const LogicalRegion& rhs);
 };
 class LogicalPartition {};
 
 class RegionRequirement {
 public:
+    LogicalRegion region;
+    std::vector<FieldID> field_ids;
+
     RegionRequirement(LogicalRegion _handle, PrivilegeMode _priv,
                       CoherenceProperty _prop, LogicalRegion _parent);
     RegionRequirement& add_field(FieldID fid);
 };
 
-class PhysicalRegion {};
+class PhysicalRegion {
+public:
+    LogicalRegion& lregion;
+    std::map<FieldID, void*> data;  // layout: column-major
+
+    PhysicalRegion& operator=(PhysicalRegion rhs);
+};
 
 template <PrivilegeMode MODE, typename FT, int N>
 class FieldAccessor {
 public:
+    const PhysicalRegion& store;
+    FieldID field;
+
     FieldAccessor(const PhysicalRegion& region, FieldID fid);
-    FT& operator[](const Point<N>&) const;
+    FT& operator[](const Point<N>& p) const;
 };
 
 /* Runtime types and classes. */

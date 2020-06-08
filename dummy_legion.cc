@@ -1,6 +1,8 @@
 #include "dummy_legion.hh"
 
 #include <cstddef>
+#include <cstdint>
+#include <map>
 #include <vector>
 
 namespace Legion {
@@ -98,25 +100,51 @@ PointInRectIterator<DIM, T> PointInRectIterator<DIM, T>::operator++(int) {
 /* Memory structures. */
 
 template <unsigned int DIM>
-IndexSpaceT<DIM>::IndexSpaceT(const IndexSpace& rhs) {}
+IndexSpaceT<DIM>::IndexSpaceT(const IndexSpace& rhs) : rect(rhs.dom) {}
 
 FieldID FieldAllocator::allocate_field(size_t field_size,
-                                       FieldID desired_fieldid) {}
+                                       FieldID desired_fieldid) {
+    space.fields[desired_fieldid] = field_size;
+    return desired_fieldid;
+}
 
 template <unsigned int DIM>
-LogicalRegionT<DIM>::LogicalRegionT(const LogicalRegion& rhs) {}
+LogicalRegionT<DIM>::LogicalRegionT(const LogicalRegion& rhs)
+    : ispace(rhs.ispace), fspace(rhs.fspace) {}
 
 RegionRequirement::RegionRequirement(LogicalRegion _handle,
                                      PrivilegeMode _priv,
                                      CoherenceProperty _prop,
-                                     LogicalRegion _parent) {}
-RegionRequirement& RegionRequirement::add_field(FieldID fid) {}
+                                     LogicalRegion _parent)
+    : region(_handle) {}
+RegionRequirement& RegionRequirement::add_field(FieldID fid) {
+    field_ids.push_back(fid);
+    return *this;
+}
+
+PhysicalRegion& PhysicalRegion::operator=(PhysicalRegion rhs) {
+    lregion = rhs.lregion;
+    data = rhs.data;
+    return *this;
+}
 
 template <PrivilegeMode MODE, typename FT, int N>
 FieldAccessor<MODE, FT, N>::FieldAccessor(const PhysicalRegion& region,
-                                          FieldID fid) {}
+                                          FieldID fid)
+    : store(region), field(fid) {}
 template <PrivilegeMode MODE, typename FT, int N>
-FT& FieldAccessor<MODE, FT, N>::operator[](const Point<N>&) const {}
+FT& FieldAccessor<MODE, FT, N>::operator[](const Point<N>& p) const {
+    Domain dom = store.lregion.ispace.dom;
+    size_t index = 0;
+    size_t dim_prod = 1;
+    for (unsigned int dim = 0; dim < p.coords.size(); dim++) {
+        index += p.coords[dim] * dim_prod;
+        dim_prod *= dom.hi.coords[dim] - dom.lo.coords[dim] + 1;
+    }
+    uint8_t* base = static_cast<uint8_t*>(store.data.at(field));
+    size_t fsize = store.lregion.fspace.fields[field];
+    return *(FT*)(base + index * fsize);
+}
 
 /* Runtime types and classes. */
 
