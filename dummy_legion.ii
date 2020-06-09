@@ -1,5 +1,3 @@
-#include "dummy_legion.hh"
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -7,6 +5,8 @@
 #include <cstring>
 #include <unordered_map>
 #include <vector>
+
+#include "dummy_legion.hh"
 
 namespace Legion {
 
@@ -25,6 +25,10 @@ template <unsigned int DIM, typename T>
 T& Point<DIM, T>::operator[](unsigned int ix) {
     return coords[ix];
 }
+template <unsigned int DIM, typename T>
+const T& Point<DIM, T>::operator[](unsigned int ix) const {
+    return coords[ix];
+}
 
 template <unsigned int DIM>
 DomainPoint::DomainPoint(const Point<DIM>& rhs) {
@@ -38,16 +42,10 @@ bool DomainPoint::operator==(const DomainPoint& other) const {
 }
 
 template <unsigned int DIM, typename T>
-Rect<DIM, T>::Rect(Point<DIM, T> lo_, Point<DIM, T> hi_) {
-    lo = lo_;
-    hi = hi_;
-}
+Rect<DIM, T>::Rect(Point<DIM, T> lo_, Point<DIM, T> hi_) : lo(lo_), hi(hi_) {}
 
 template <unsigned int DIM, typename T>
-Domain::Domain(const Rect<DIM, T>& other) {
-    lo = other.lo;
-    hi = other.hi;
-}
+Domain::Domain(const Rect<DIM, T>& other) : lo(other.lo), hi(other.hi) {}
 bool Domain::operator==(const Domain& other) const {
     return lo == other.lo && hi == other.hi;
 }
@@ -61,20 +59,16 @@ size_t Domain::size() const {
 
 template <unsigned int DIM, typename T>
 PointInRectIterator<DIM, T>::PointInRectIterator(const Rect<DIM, T>& r,
-                                                 bool column_major_order) {
-    start = r.lo;
-    cur = start;
-    end = r.hi;
-    col_major = column_major_order;
-}
+                                                 bool column_major_order)
+    : start(r.lo), cur(r.lo), end(r.hi), col_major(column_major_order) {}
 
 template <unsigned int DIM, typename T>
 bool PointInRectIterator<DIM, T>::operator()(void) const {
-    return cur != end;
+    return cur.coords != end.coords;
 }
 template <unsigned int DIM, typename T>
 Point<DIM, T> PointInRectIterator<DIM, T>::operator*(void)const {
-    return &cur;
+    return cur;
 }
 template <unsigned int DIM, typename T>
 PointInRectIterator<DIM, T> PointInRectIterator<DIM, T>::operator++(int) {
@@ -107,7 +101,7 @@ bool IndexSpace::operator==(const IndexSpace& other) const {
 }
 size_t IndexSpace::size() const { return dom.size(); }
 template <unsigned int DIM>
-IndexSpaceT<DIM>::IndexSpaceT(const IndexSpace& rhs) : rect(rhs.dom) {}
+IndexSpaceT<DIM>::IndexSpaceT(const IndexSpace& rhs) : dom(rhs.dom) {}
 
 bool FieldSpace::operator==(const FieldSpace& other) const {
     return fields == other.fields;
@@ -198,9 +192,6 @@ TaskVariantRegistrar& TaskVariantRegistrar::add_constraint(
 
 InlineLauncher::InlineLauncher(const RegionRequirement& req) : _req(req) {}
 
-InputArgs Runtime::input_args;
-std::unordered_map<VariantID, RuntimeHelper> Runtime::tasks;
-
 InputArgs Runtime::get_input_args() { return input_args; }
 void Runtime::set_top_level_task_id(TaskID top_id) {
     top_level_task_id = top_id;
@@ -210,7 +201,7 @@ int Runtime::start(int argc, char** argv) {
     Task task = {.args = nullptr};
     Runtime rt;
     tasks.at(top_level_task_id)
-        .run(&task, std::vector<PhysicalRegion>(), Context(), &rt);
+        ->run(&task, std::vector<PhysicalRegion>(), Context(), &rt);
     return 0;
 }
 IndexSpace Runtime::create_index_space(Context ctx, const Domain& bounds) {
@@ -258,7 +249,7 @@ Future Runtime::execute_task(Context ctx, const TaskLauncher& launcher) {
     for (auto req : launcher.reqs) {
         regions.push_back(materialize(req.region));
     }
-    void* ret = tasks.at(launcher._tid).run(&task, regions, ctx, this);
+    void* ret = tasks.at(launcher._tid)->run(&task, regions, ctx, this);
     return Future(ret);
 }
 template <typename T,
@@ -266,14 +257,14 @@ template <typename T,
                         Context, Runtime*)>
 VariantID Runtime::preregister_task_variant(
     const TaskVariantRegistrar& registrar, const char* task_name) {
-    tasks[registrar.id] = RuntimeHelperT<T, TASK_PTR>();
+    tasks[registrar.id] = new RuntimeHelperT<T, TASK_PTR>;
     return registrar.id;
 }
 template <void (*TASK_PTR)(const Task*, const std::vector<PhysicalRegion>&,
                            Context, Runtime*)>
 VariantID Runtime::preregister_task_variant(
     const TaskVariantRegistrar& registrar, const char* task_name) {
-    tasks[registrar.id] = RuntimeHelperT<void, TASK_PTR>();
+    tasks[registrar.id] = new RuntimeHelperT<void, TASK_PTR>;
     return registrar.id;
 }
 PhysicalRegion Runtime::materialize(const LogicalRegion& lregion) {

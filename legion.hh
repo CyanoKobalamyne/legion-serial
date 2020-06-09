@@ -38,6 +38,7 @@ public:
     Point(T p1, T p2);
 
     T& operator[](unsigned int ix);
+    const T& operator[](unsigned int ix) const;
 };
 class DomainPoint {
 public:
@@ -92,7 +93,7 @@ public:
 template <unsigned int DIM>
 class IndexSpaceT : public IndexSpace {
 public:
-    Rect<DIM> rect;
+    Domain dom;
 
     IndexSpaceT(const IndexSpace& rhs);
 };
@@ -230,11 +231,11 @@ struct InputArgs {
 class RuntimeHelper;
 class Runtime {
 public:
-    static InputArgs input_args;
+    inline static InputArgs input_args;
     inline static TaskID top_level_task_id;
-    static std::unordered_map<VariantID, RuntimeHelper> tasks;
-    static std::vector<LogicalRegion> lregions;
-    static std::unordered_map<size_t, PhysicalRegion> pregions;
+    inline static std::unordered_map<VariantID, RuntimeHelper*> tasks;
+    inline static std::vector<LogicalRegion> lregions;
+    inline static std::unordered_map<size_t, PhysicalRegion> pregions;
 
     static InputArgs get_input_args();
     static void set_top_level_task_id(TaskID top_id);
