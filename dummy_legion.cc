@@ -1,8 +1,11 @@
 #include "dummy_legion.hh"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <map>
+#include <cstdlib>
+#include <cstring>
+#include <unordered_map>
 #include <vector>
 
 namespace Legion {
@@ -19,19 +22,6 @@ Point<DIM, T>::Point(T p1, T p2) {
     coords.push_back(p2);
 }
 template <unsigned int DIM, typename T>
-template <unsigned int DIM2, typename T2>
-bool Point<DIM, T>::operator==(const Point<DIM2, T2>& other) {
-    if (DIM != DIM2) {
-        return false;
-    }
-    for (unsigned int i = 0; i < DIM; i++) {
-        if (this->coords[i] != other.coords[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-template <unsigned int DIM, typename T>
 T& Point<DIM, T>::operator[](unsigned int ix) {
     return coords[ix];
 }
@@ -43,6 +33,9 @@ DomainPoint::DomainPoint(const Point<DIM>& rhs) {
     }
 }
 DomainPoint::DomainPoint(coord_t coord) { coords.push_back(coord); }
+bool DomainPoint::operator==(const DomainPoint& other) const {
+    return coords == other.coords;
+}
 
 template <unsigned int DIM, typename T>
 Rect<DIM, T>::Rect(Point<DIM, T> lo_, Point<DIM, T> hi_) {
@@ -54,6 +47,16 @@ template <unsigned int DIM, typename T>
 Domain::Domain(const Rect<DIM, T>& other) {
     lo = other.lo;
     hi = other.hi;
+}
+bool Domain::operator==(const Domain& other) const {
+    return lo == other.lo && hi == other.hi;
+}
+size_t Domain::size() const {
+    size_t size = 0;
+    for (unsigned int i = 0; i < lo.coords.size(); i++) {
+        size *= hi.coords[i] - lo.coords[i] + 1;
+    }
+    return size;
 }
 
 template <unsigned int DIM, typename T>
@@ -99,8 +102,16 @@ PointInRectIterator<DIM, T> PointInRectIterator<DIM, T>::operator++(int) {
 
 /* Memory structures. */
 
+bool IndexSpace::operator==(const IndexSpace& other) const {
+    return dom == other.dom;
+}
+size_t IndexSpace::size() const { return dom.size(); }
 template <unsigned int DIM>
 IndexSpaceT<DIM>::IndexSpaceT(const IndexSpace& rhs) : rect(rhs.dom) {}
+
+bool FieldSpace::operator==(const FieldSpace& other) const {
+    return fields == other.fields;
+}
 
 FieldID FieldAllocator::allocate_field(size_t field_size,
                                        FieldID desired_fieldid) {
@@ -108,6 +119,9 @@ FieldID FieldAllocator::allocate_field(size_t field_size,
     return desired_fieldid;
 }
 
+bool LogicalRegion::operator==(const LogicalRegion& other) const {
+    return ispace == other.ispace && fspace == other.fspace;
+}
 template <unsigned int DIM>
 LogicalRegionT<DIM>::LogicalRegionT(const LogicalRegion& rhs)
     : ispace(rhs.ispace), fspace(rhs.fspace) {}
@@ -142,50 +156,132 @@ FT& FieldAccessor<MODE, FT, N>::operator[](const Point<N>& p) const {
         dim_prod *= dom.hi.coords[dim] - dom.lo.coords[dim] + 1;
     }
     uint8_t* base = static_cast<uint8_t*>(store.data.at(field));
-    size_t fsize = store.lregion.fspace.fields[field];
+    size_t fsize = store.lregion.fspace.fields.at(field);
     return *(FT*)(base + index * fsize);
 }
 
 /* Runtime types and classes. */
 
+Future::Future(void* _res) : res(_res) {}
 template <typename T>
-T Future::get_result() const {}
-bool Future::is_ready() const {}
+T Future::get_result() const {
+    return *(T*)res;
+}
+bool Future::is_ready() const { return true; }
 
 ProcessorConstraint::ProcessorConstraint(Processor::Kind kind) {}
 
-TaskArgument::TaskArgument(const void* arg, size_t argsize) {}
+TaskArgument::TaskArgument(const void* arg, size_t argsize) {
+    _arg = std::malloc(argsize);
+    std::memcpy(_arg, arg, argsize);
+}
+TaskArgument::~TaskArgument() { free(_arg); }
 
-TaskLauncher::TaskLauncher(TaskID tid, TaskArgument arg) {}
+TaskLauncher::TaskLauncher(TaskID tid, TaskArgument arg)
+    : _tid(tid), _arg(arg) {}
 RegionRequirement& TaskLauncher::add_region_requirement(
-    const RegionRequirement& req) {}
-void TaskLauncher::add_field(unsigned int idx, FieldID fid) {}
+    const RegionRequirement& req) {
+    reqs.push_back(req);
+    return reqs[reqs.size() - 1];
+}
+void TaskLauncher::add_field(unsigned int idx, FieldID fid) {
+    reqs[idx].add_field(fid);
+}
 
 TaskVariantRegistrar::TaskVariantRegistrar(TaskID task_id,
-                                           const char* variant_name) {}
+                                           const char* variant_name)
+    : id(task_id) {}
 TaskVariantRegistrar& TaskVariantRegistrar::add_constraint(
-    const ProcessorConstraint& constraint) {}
+    const ProcessorConstraint& constraint) {
+    return *this;
+}
 
-InlineLauncher::InlineLauncher(const RegionRequirement& req) {}
+InlineLauncher::InlineLauncher(const RegionRequirement& req) : _req(req) {}
 
-InputArgs Runtime::get_input_args() {}
-void Runtime::set_top_level_task_id(TaskID top_id) {}
-int Runtime::start(int argc, char** argv) {}
-IndexSpace Runtime::create_index_space(Context ctx, const Domain& bounds) {}
+InputArgs Runtime::input_args;
+std::unordered_map<VariantID, RuntimeHelper> Runtime::tasks;
+
+InputArgs Runtime::get_input_args() { return input_args; }
+void Runtime::set_top_level_task_id(TaskID top_id) {
+    top_level_task_id = top_id;
+}
+int Runtime::start(int argc, char** argv) {
+    input_args = {.argc = argc, .argv = argv};
+    Task task = {.args = nullptr};
+    Runtime rt;
+    tasks.at(top_level_task_id)
+        .run(&task, std::vector<PhysicalRegion>(), Context(), &rt);
+    return 0;
+}
+IndexSpace Runtime::create_index_space(Context ctx, const Domain& bounds) {
+    IndexSpace is;
+    is.dom = bounds;
+    return is;
+}
 IndexPartition Runtime::create_equal_partition(Context ctx, IndexSpace parent,
-                                               IndexSpace color_space) {}
-FieldSpace Runtime::create_field_space(Context ctx) {}
+                                               IndexSpace color_space) {
+    return IndexPartition();
+}
+FieldSpace Runtime::create_field_space(Context ctx) { return FieldSpace(); }
 FieldAllocator Runtime::create_field_allocator(Context ctx,
-                                               FieldSpace handle) {}
+                                               FieldSpace handle) {
+    FieldAllocator fa;
+    fa.space = handle;
+    return fa;
+}
 LogicalRegion Runtime::create_logical_region(Context ctx, IndexSpace index,
-                                             FieldSpace fields) {}
+                                             FieldSpace fields) {
+    LogicalRegion region;
+    region.ispace = index;
+    region.fspace = fields;
+    return region;
+}
 PhysicalRegion Runtime::map_region(Context ctx,
-                                   const InlineLauncher& launcher) {}
+                                   const InlineLauncher& launcher) {
+    return materialize(launcher._req.region);
+}
 void Runtime::unmap_region(Context ctx, PhysicalRegion region) {}
 LogicalPartition Runtime::get_logical_partition(LogicalRegion parent,
-                                                IndexPartition handle) {}
+                                                IndexPartition handle) {
+    LogicalPartition part;
+    part.region = parent;
+    return part;
+}
 LogicalRegion Runtime::get_logical_subregion_by_color(LogicalPartition parent,
-                                                      const DomainPoint& c) {}
-Future Runtime::execute_task(Context ctx, const TaskLauncher& launcher) {}
+                                                      const DomainPoint& c) {
+    return parent.region;
+}
+Future Runtime::execute_task(Context ctx, const TaskLauncher& launcher) {
+    Task task;
+    task.args = launcher._arg._arg;
+    std::vector<PhysicalRegion> regions;
+    for (auto req : launcher.reqs) {
+        regions.push_back(materialize(req.region));
+    }
+    void* ret = tasks.at(launcher._tid).run(&task, regions, ctx, this);
+    return Future(ret);
+}
+PhysicalRegion Runtime::materialize(const LogicalRegion& lregion) {
+    auto it = std::find(lregions.begin(), lregions.end(), lregion);
+    if (it != lregions.end()) {
+        return pregions.at(it - lregions.begin());
+    } else {
+        lregions.push_back(lregion);
+        PhysicalRegion pregion;
+        pregion.lregion = lregion;
+        // Allocate storage space.
+        for (auto fid_size : lregion.fspace.fields) {
+            pregion.data[fid_size.first] =
+                std::malloc(fid_size.second * lregion.ispace.size());
+        }
+        pregions[lregions.size() - 1] = pregion;
+        return pregion;
+    }
+}
+void* RuntimeHelper::run(const Task* task,
+                         const std::vector<PhysicalRegion>& regions,
+                         Context ctx, Runtime* rt) {
+    return nullptr;
+}
 
 }  // namespace Legion

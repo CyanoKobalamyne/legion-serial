@@ -2,7 +2,8 @@
 #define LEGION_HH_
 
 #include <cstddef>
-#include <map>
+#include <functional>
+#include <unordered_map>
 #include <vector>
 
 enum legion_privilege_mode_t {
@@ -36,17 +37,17 @@ public:
     Point(T p);
     Point(T p1, T p2);
 
-    template <unsigned int DIM2, typename T2 = int>
-    bool operator==(const Point<DIM2, T2>& other);
     T& operator[](unsigned int ix);
 };
 class DomainPoint {
 public:
     std::vector<coord_t> coords;
 
+    DomainPoint() = default;
     template <unsigned int DIM>
     DomainPoint(const Point<DIM>& rhs);
     DomainPoint(coord_t coord);
+    bool operator==(const DomainPoint& other) const;
 };
 
 template <unsigned int DIM, typename T = int>
@@ -60,8 +61,11 @@ class Domain {
 public:
     DomainPoint lo, hi;
 
+    Domain() = default;
     template <unsigned int DIM, typename T = int>
     Domain(const Rect<DIM, T>& other);
+    bool operator==(const Domain& other) const;
+    size_t size() const;
 };
 
 template <unsigned int DIM, typename T = int>
@@ -81,6 +85,9 @@ public:
 class IndexSpace {
 public:
     Domain dom;
+
+    bool operator==(const IndexSpace& other) const;
+    size_t size() const;
 };
 template <unsigned int DIM>
 class IndexSpaceT : public IndexSpace {
@@ -93,7 +100,9 @@ class IndexPartition {};
 
 class FieldSpace {
 public:
-    std::map<FieldID, size_t> fields;
+    std::unordered_map<FieldID, size_t> fields;
+
+    bool operator==(const FieldSpace& other) const;
 };
 class FieldAllocator {
 public:
@@ -106,6 +115,8 @@ class LogicalRegion {
 public:
     IndexSpace ispace;
     FieldSpace fspace;
+
+    bool operator==(const LogicalRegion& other) const;
 };
 template <unsigned int DIM>
 class LogicalRegionT : public LogicalRegion {
@@ -115,7 +126,10 @@ public:
 
     LogicalRegionT(const LogicalRegion& rhs);
 };
-class LogicalPartition {};
+class LogicalPartition {
+public:
+    LogicalRegion region;
+};
 
 class RegionRequirement {
 public:
@@ -129,8 +143,8 @@ public:
 
 class PhysicalRegion {
 public:
-    LogicalRegion& lregion;
-    std::map<FieldID, void*> data;  // layout: column-major
+    LogicalRegion lregion;
+    std::unordered_map<FieldID, void*> data;  // layout: column-major
 
     PhysicalRegion& operator=(PhysicalRegion rhs);
 };
@@ -151,6 +165,9 @@ class Context {};
 
 class Future {
 public:
+    void* res = nullptr;
+
+    Future(void* _res);
     template <typename T>
     T get_result() const;
     bool is_ready() const;
@@ -174,16 +191,25 @@ public:
 };
 class TaskArgument {
 public:
+    void* _arg;
+
     TaskArgument(const void* arg, size_t argsize);
+    ~TaskArgument();
 };
 class TaskLauncher {
 public:
+    TaskID _tid;
+    TaskArgument _arg;
+    std::vector<RegionRequirement> reqs;
+
     TaskLauncher(TaskID tid, TaskArgument arg);
     RegionRequirement& add_region_requirement(const RegionRequirement& req);
     void add_field(unsigned int idx, FieldID fid);
 };
 class TaskVariantRegistrar {
 public:
+    TaskID id;
+
     TaskVariantRegistrar(TaskID task_id, const char* variant_name);
     TaskVariantRegistrar& add_constraint(
         const ProcessorConstraint& constraint);
@@ -191,6 +217,8 @@ public:
 
 class InlineLauncher {
 public:
+    RegionRequirement _req;
+
     InlineLauncher(const RegionRequirement& req);
 };
 
@@ -199,8 +227,15 @@ struct InputArgs {
     char** argv;
 };
 
+class RuntimeHelper;
 class Runtime {
 public:
+    static InputArgs input_args;
+    inline static TaskID top_level_task_id;
+    static std::unordered_map<VariantID, RuntimeHelper> tasks;
+    static std::vector<LogicalRegion> lregions;
+    static std::unordered_map<size_t, PhysicalRegion> pregions;
+
     static InputArgs get_input_args();
     static void set_top_level_task_id(TaskID top_id);
     static int start(int argc, char** argv);
@@ -219,14 +254,36 @@ public:
                                                  const DomainPoint& c);
     Future execute_task(Context ctx, const TaskLauncher& launcher);
     template <typename T,
-              T (*)(const Task*, const std::vector<PhysicalRegion>&, Context,
-                    Runtime*)>
+              T (*TASK_PTR)(const Task*, const std::vector<PhysicalRegion>&,
+                            Context, Runtime*)>
     static VariantID preregister_task_variant(
         const TaskVariantRegistrar& registrar, const char* task_name = NULL);
-    template <void (*)(const Task*, const std::vector<PhysicalRegion>&,
-                       Context, Runtime*)>
+    template <void (*TASK_PTR)(const Task*, const std::vector<PhysicalRegion>&,
+                               Context, Runtime*)>
     static VariantID preregister_task_variant(
         const TaskVariantRegistrar& registrar, const char* task_name = NULL);
+    static PhysicalRegion materialize(const LogicalRegion& lregion);
+};
+class RuntimeHelper {
+public:
+    virtual void* run(const Task* task,
+                      const std::vector<PhysicalRegion>& regions, Context ctx,
+                      Runtime* rt);
+};
+template <typename T,
+          T (*TASK_PTR)(const Task*, const std::vector<PhysicalRegion>&,
+                        Context, Runtime*)>
+class RuntimeHelperT : public RuntimeHelper {
+public:
+    void* run(const Task* task, const std::vector<PhysicalRegion>& regions,
+              Context ctx, Runtime* rt);
+};
+template <void (*TASK_PTR)(const Task*, const std::vector<PhysicalRegion>&,
+                           Context, Runtime*)>
+class RuntimeHelperT<void, TASK_PTR> : public RuntimeHelper {
+public:
+    void* run(const Task* task, const std::vector<PhysicalRegion>& regions,
+              Context ctx, Runtime* rt);
 };
 }  // namespace Legion
 
