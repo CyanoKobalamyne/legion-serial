@@ -23,6 +23,7 @@ namespace Legion {
 typedef unsigned long FieldID;
 typedef unsigned int TaskID;
 typedef unsigned int VariantID;
+typedef size_t FieldSpaceID;
 typedef long long int coord_t;
 typedef ::legion_privilege_mode_t PrivilegeMode;
 typedef ::legion_coherence_property_t CoherenceProperty;
@@ -49,6 +50,8 @@ public:
     DomainPoint(const Point<DIM>& rhs);
     DomainPoint(coord_t coord);
     bool operator==(const DomainPoint& other) const;
+    coord_t& operator[](unsigned int ix);
+    const coord_t& operator[](unsigned int ix) const;
 };
 
 template <unsigned int DIM, typename T = int>
@@ -87,28 +90,29 @@ class IndexSpace {
 public:
     Domain dom;
 
+    IndexSpace(Domain _dom);
     bool operator==(const IndexSpace& other) const;
     size_t size() const;
 };
 template <unsigned int DIM>
 class IndexSpaceT : public IndexSpace {
 public:
-    Domain dom;
-
     IndexSpaceT(const IndexSpace& rhs);
 };
 class IndexPartition {};
 
 class FieldSpace {
 public:
-    std::unordered_map<FieldID, size_t> fields;
+    FieldSpaceID id;
 
+    FieldSpace(FieldSpaceID fsid);
     bool operator==(const FieldSpace& other) const;
 };
 class FieldAllocator {
 public:
-    FieldSpace space;
+    FieldSpaceID id;
 
+    FieldAllocator(FieldSpaceID _id);
     FieldID allocate_field(size_t field_size, FieldID desired_fieldid);
 };
 
@@ -117,19 +121,19 @@ public:
     IndexSpace ispace;
     FieldSpace fspace;
 
+    LogicalRegion(IndexSpace _ispace, FieldSpace _fspace);
     bool operator==(const LogicalRegion& other) const;
 };
 template <unsigned int DIM>
 class LogicalRegionT : public LogicalRegion {
 public:
-    IndexSpaceT<DIM> ispace;
-    FieldSpace fspace;
-
     LogicalRegionT(const LogicalRegion& rhs);
 };
 class LogicalPartition {
 public:
     LogicalRegion region;
+
+    LogicalPartition(LogicalRegion _region);
 };
 
 class RegionRequirement {
@@ -147,7 +151,7 @@ public:
     LogicalRegion lregion;
     std::unordered_map<FieldID, void*> data;  // layout: column-major
 
-    PhysicalRegion& operator=(PhysicalRegion rhs);
+    PhysicalRegion(const LogicalRegion& region);
 };
 
 template <PrivilegeMode MODE, typename FT, int N>
@@ -186,16 +190,19 @@ public:
     ProcessorConstraint(Processor::Kind kind = Processor::NO_KIND);
 };
 
+class TaskArgument {
+public:
+    const void* _arg;
+    size_t _argsize;
+
+    TaskArgument(const void* arg, size_t argsize);
+};
 class Task {
 public:
     void* args;
-};
-class TaskArgument {
-public:
-    void* _arg;
 
-    TaskArgument(const void* arg, size_t argsize);
-    ~TaskArgument();
+    Task(TaskArgument ta);
+    ~Task();
 };
 class TaskLauncher {
 public:
@@ -234,8 +241,9 @@ public:
     inline static InputArgs input_args;
     inline static TaskID top_level_task_id;
     inline static std::unordered_map<VariantID, RuntimeHelper*> tasks;
-    inline static std::vector<LogicalRegion> lregions;
-    inline static std::unordered_map<size_t, PhysicalRegion> pregions;
+    inline static std::vector<std::unordered_map<FieldID, size_t>>
+        field_spaces;
+    inline static std::vector<PhysicalRegion> regions;
 
     static InputArgs get_input_args();
     static void set_top_level_task_id(TaskID top_id);
@@ -263,7 +271,9 @@ public:
                                Context, Runtime*)>
     static VariantID preregister_task_variant(
         const TaskVariantRegistrar& registrar, const char* task_name = NULL);
-    static PhysicalRegion materialize(const LogicalRegion& lregion);
+
+private:
+    static PhysicalRegion __get_physical_region(const LogicalRegion& lregion);
 };
 class RuntimeHelper {
 public:
