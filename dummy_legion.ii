@@ -216,6 +216,11 @@ int Runtime::start(int argc, char** argv) {
     for (auto task : tasks) {
         delete task.second;
     }
+    for (auto region : regions) {
+        for (auto field : region.data) {
+            std::free(field.second);
+        }
+    }
 
     return 0;
 }
