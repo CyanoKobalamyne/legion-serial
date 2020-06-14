@@ -179,7 +179,7 @@ Task::Task(TaskArgument ta) {
     args = std::malloc(ta._argsize);
     memcpy(args, ta._arg, ta._argsize);
 }
-Task::~Task() { free(args); }
+Task::~Task() { std::free(args); }
 TaskLauncher::TaskLauncher(TaskID tid, TaskArgument arg)
     : _tid(tid), _arg(arg) {}
 RegionRequirement& TaskLauncher::add_region_requirement(
