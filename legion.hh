@@ -280,6 +280,7 @@ public:
     virtual void* run(const Task* task,
                       const std::vector<PhysicalRegion>& regions, Context ctx,
                       Runtime* rt);
+    virtual ~RuntimeHelper();
 };
 template <typename T,
           T (*TASK_PTR)(const Task*, const std::vector<PhysicalRegion>&,
