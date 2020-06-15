@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <functional>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 enum legion_privilege_mode_t {
@@ -24,6 +25,7 @@ typedef unsigned long FieldID;
 typedef unsigned int TaskID;
 typedef unsigned int VariantID;
 typedef size_t FieldSpaceID;
+typedef size_t RegionID;
 typedef long long int coord_t;
 typedef ::legion_privilege_mode_t PrivilegeMode;
 typedef ::legion_coherence_property_t CoherenceProperty;
@@ -118,10 +120,9 @@ public:
 
 class LogicalRegion {
 public:
-    IndexSpace ispace;
-    FieldSpace fspace;
+    RegionID id;
 
-    LogicalRegion(IndexSpace _ispace, FieldSpace _fspace);
+    LogicalRegion(RegionID _id);
     bool operator==(const LogicalRegion& other) const;
 };
 template <unsigned int DIM>
@@ -148,10 +149,9 @@ public:
 
 class PhysicalRegion {
 public:
-    LogicalRegion lregion;
-    std::unordered_map<FieldID, void*> data;  // layout: column-major
+    RegionID id;
 
-    PhysicalRegion(const LogicalRegion& region);
+    PhysicalRegion(RegionID _id);
 };
 
 template <PrivilegeMode MODE, typename FT, int N>
@@ -243,7 +243,10 @@ public:
     inline static std::unordered_map<VariantID, RuntimeHelper*> tasks;
     inline static std::vector<std::unordered_map<FieldID, size_t>>
         field_spaces;
-    inline static std::vector<PhysicalRegion> regions;
+    inline static std::vector<std::pair<IndexSpace, FieldSpace>>
+        logical_regions;
+    inline static std::vector<std::unordered_map<FieldID, void*>>
+        physical_regions;
     inline static std::vector<Future> futures;
 
     static InputArgs get_input_args();
@@ -272,9 +275,6 @@ public:
                                Context, Runtime*)>
     static VariantID preregister_task_variant(
         const TaskVariantRegistrar& registrar, const char* task_name = NULL);
-
-private:
-    static PhysicalRegion __get_physical_region(const LogicalRegion& lregion);
 };
 class RuntimeHelper {
 public:

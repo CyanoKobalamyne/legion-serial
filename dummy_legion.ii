@@ -5,6 +5,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "dummy_legion.hh"
@@ -121,14 +122,13 @@ FieldID FieldAllocator::allocate_field(size_t field_size,
     return desired_fieldid;
 }
 
-LogicalRegion::LogicalRegion(IndexSpace _ispace, FieldSpace _fspace)
-    : ispace(_ispace), fspace(_fspace) {}
+LogicalRegion::LogicalRegion(RegionID _id) : id(_id) {}
 bool LogicalRegion::operator==(const LogicalRegion& other) const {
-    return ispace == other.ispace && fspace == other.fspace;
+    return id == other.id;
 }
 template <unsigned int DIM>
 LogicalRegionT<DIM>::LogicalRegionT(const LogicalRegion& rhs)
-    : LogicalRegion(rhs.ispace, rhs.fspace) {}
+    : LogicalRegion(rhs.id) {}
 LogicalPartition::LogicalPartition(LogicalRegion _region) : region(_region) {}
 
 RegionRequirement::RegionRequirement(LogicalRegion _handle,
@@ -141,8 +141,7 @@ RegionRequirement& RegionRequirement::add_field(FieldID fid) {
     return *this;
 }
 
-PhysicalRegion::PhysicalRegion(const LogicalRegion& region)
-    : lregion(region) {}
+PhysicalRegion::PhysicalRegion(RegionID _id) : id(_id) {}
 
 template <PrivilegeMode MODE, typename FT, int N>
 FieldAccessor<MODE, FT, N>::FieldAccessor(const PhysicalRegion& region,
@@ -150,15 +149,18 @@ FieldAccessor<MODE, FT, N>::FieldAccessor(const PhysicalRegion& region,
     : store(region), field(fid) {}
 template <PrivilegeMode MODE, typename FT, int N>
 FT& FieldAccessor<MODE, FT, N>::operator[](const Point<N>& p) const {
-    Domain dom = store.lregion.ispace.dom;
+    Domain dom = Runtime::logical_regions.at(store.id).first.dom;
     size_t index = 0;
     size_t dim_prod = 1;
     for (unsigned int dim = 0; dim < p.coords.size(); dim++) {
         index += p[dim] * dim_prod;
         dim_prod *= dom.hi[dim] - dom.lo[dim] + 1;
     }
-    uint8_t* base = static_cast<uint8_t*>(store.data.at(field));
-    size_t fsize = Runtime::field_spaces.at(store.lregion.fspace.id).at(field);
+    uint8_t* base = static_cast<uint8_t*>(
+        Runtime::physical_regions.at(store.id).at(field));
+    size_t fsize = Runtime::field_spaces
+                       .at(Runtime::logical_regions.at(store.id).second.id)
+                       .at(field);
     return *(FT*)(base + index * fsize);
 }
 
@@ -219,8 +221,8 @@ int Runtime::start(int argc, char** argv) {
     for (auto task : tasks) {
         delete task.second;
     }
-    for (auto region : regions) {
-        for (auto field : region.data) {
+    for (auto region : physical_regions) {
+        for (auto field : region) {
             std::free(field.second);
         }
     }
@@ -244,19 +246,19 @@ FieldAllocator Runtime::create_field_allocator(Context ctx,
 }
 LogicalRegion Runtime::create_logical_region(Context ctx, IndexSpace index,
                                              FieldSpace fields) {
-    LogicalRegion lregion(index, fields);
-    PhysicalRegion pregion(lregion);
+    RegionID id = logical_regions.size();
+    logical_regions.push_back(std::make_pair(index, fields));
     // Allocate storage space.
+    physical_regions.emplace_back();
     for (auto field : field_spaces.at(fields.id)) {
-        pregion.data.insert_or_assign(
+        physical_regions.at(id).insert_or_assign(
             field.first, std::malloc(field.second * index.size()));
     }
-    regions.push_back(pregion);
-    return lregion;
+    return LogicalRegion(id);
 }
 PhysicalRegion Runtime::map_region(Context ctx,
                                    const InlineLauncher& launcher) {
-    return __get_physical_region(launcher._req.region);
+    return PhysicalRegion(launcher._req.region.id);
 }
 void Runtime::unmap_region(Context ctx, PhysicalRegion region) {}
 LogicalPartition Runtime::get_logical_partition(LogicalRegion parent,
@@ -271,7 +273,7 @@ Future Runtime::execute_task(Context ctx, const TaskLauncher& launcher) {
     Task task(launcher._arg);
     std::vector<PhysicalRegion> regions;
     for (auto req : launcher.reqs) {
-        regions.push_back(__get_physical_region(req.region));
+        regions.push_back(PhysicalRegion(req.region.id));
     }
     Future fut(tasks.at(launcher._tid)->run(&task, regions, ctx, this));
     futures.push_back(fut);
@@ -291,15 +293,6 @@ VariantID Runtime::preregister_task_variant(
     const TaskVariantRegistrar& registrar, const char* task_name) {
     tasks.insert_or_assign(registrar.id, new RuntimeHelperT<void, TASK_PTR>);
     return registrar.id;
-}
-PhysicalRegion Runtime::__get_physical_region(const LogicalRegion& lregion) {
-    auto it = std::find_if(regions.begin(), regions.end(),
-                           [&](auto pr) { return pr.lregion == lregion; });
-    if (it != regions.end()) {
-        return regions.at(it - regions.begin());
-    } else {
-        throw std::invalid_argument("No such region");
-    }
 }
 void* RuntimeHelper::run(const Task* task,
                          const std::vector<PhysicalRegion>& regions,
