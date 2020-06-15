@@ -213,6 +213,9 @@ int Runtime::start(int argc, char** argv) {
         ->run(&task, std::vector<PhysicalRegion>(), Context(), &rt);
 
     // Free dynamically allocated memory.
+    for (auto future : futures) {
+        std::free(future.res);
+    }
     for (auto task : tasks) {
         delete task.second;
     }
@@ -270,8 +273,9 @@ Future Runtime::execute_task(Context ctx, const TaskLauncher& launcher) {
     for (auto req : launcher.reqs) {
         regions.push_back(__get_physical_region(req.region));
     }
-    void* ret = tasks.at(launcher._tid)->run(&task, regions, ctx, this);
-    return Future(ret);
+    Future fut(tasks.at(launcher._tid)->run(&task, regions, ctx, this));
+    futures.push_back(fut);
+    return fut;
 }
 template <typename T,
           T (*TASK_PTR)(const Task*, const std::vector<PhysicalRegion>&,

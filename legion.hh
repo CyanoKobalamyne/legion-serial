@@ -244,6 +244,7 @@ public:
     inline static std::vector<std::unordered_map<FieldID, size_t>>
         field_spaces;
     inline static std::vector<PhysicalRegion> regions;
+    inline static std::vector<Future> futures;
 
     static InputArgs get_input_args();
     static void set_top_level_task_id(TaskID top_id);
