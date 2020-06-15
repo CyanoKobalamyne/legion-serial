@@ -73,7 +73,7 @@ bool PointInRectIterator<DIM, T>::operator()(void) const {
     return cur.coords != end.coords;
 }
 template <unsigned int DIM, typename T>
-Point<DIM, T> PointInRectIterator<DIM, T>::operator*(void)const {
+Point<DIM, T> PointInRectIterator<DIM, T>::operator*(void) const {
     return cur;
 }
 template <unsigned int DIM, typename T>

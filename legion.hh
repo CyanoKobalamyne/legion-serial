@@ -82,7 +82,7 @@ public:
 
     PointInRectIterator(const Rect<DIM, T>& r, bool column_major_order = true);
     bool operator()(void) const;
-    Point<DIM, T> operator*(void)const;
+    Point<DIM, T> operator*(void) const;
     PointInRectIterator<DIM, T> operator++(int);
 };
 
