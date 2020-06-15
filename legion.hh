@@ -152,6 +152,7 @@ public:
     RegionID id;
 
     PhysicalRegion(RegionID _id);
+    size_t get_index(const DomainPoint& p) const;
 };
 
 template <PrivilegeMode MODE, typename FT, int N>

@@ -142,6 +142,16 @@ RegionRequirement& RegionRequirement::add_field(FieldID fid) {
 }
 
 PhysicalRegion::PhysicalRegion(RegionID _id) : id(_id) {}
+size_t PhysicalRegion::get_index(const DomainPoint& p) const {
+    Domain dom = Runtime::logical_regions.at(id).first.dom;
+    size_t index = 0;
+    size_t dim_prod = 1;
+    for (unsigned int dim = 0; dim < p.coords.size(); dim++) {
+        index += p[dim] * dim_prod;
+        dim_prod *= dom.hi[dim] - dom.lo[dim] + 1;
+    }
+    return index;
+}
 
 template <PrivilegeMode MODE, typename FT, int N>
 FieldAccessor<MODE, FT, N>::FieldAccessor(const PhysicalRegion& region,
@@ -149,13 +159,7 @@ FieldAccessor<MODE, FT, N>::FieldAccessor(const PhysicalRegion& region,
     : store(region), field(fid) {}
 template <PrivilegeMode MODE, typename FT, int N>
 FT& FieldAccessor<MODE, FT, N>::operator[](const Point<N>& p) const {
-    Domain dom = Runtime::logical_regions.at(store.id).first.dom;
-    size_t index = 0;
-    size_t dim_prod = 1;
-    for (unsigned int dim = 0; dim < p.coords.size(); dim++) {
-        index += p[dim] * dim_prod;
-        dim_prod *= dom.hi[dim] - dom.lo[dim] + 1;
-    }
+    size_t index = store.get_index(p);
     uint8_t* base = static_cast<uint8_t*>(
         Runtime::physical_regions.at(store.id).at(field));
     size_t fsize = Runtime::field_spaces
