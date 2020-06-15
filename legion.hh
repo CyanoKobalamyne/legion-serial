@@ -157,7 +157,7 @@ public:
 template <PrivilegeMode MODE, typename FT, int N>
 class FieldAccessor {
 public:
-    const PhysicalRegion& store;
+    PhysicalRegion store;
     FieldID field;
 
     FieldAccessor(const PhysicalRegion& region, FieldID fid);
