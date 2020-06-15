@@ -101,7 +101,12 @@ class IndexSpaceT : public IndexSpace {
 public:
     IndexSpaceT(const IndexSpace& rhs);
 };
-class IndexPartition {};
+class IndexPartition {
+public:
+    bool single_point = false;
+
+    IndexPartition(bool is_single_point = false);
+};
 
 class FieldSpace {
 public:
@@ -124,17 +129,27 @@ public:
 
     LogicalRegion(RegionID _id);
     bool operator==(const LogicalRegion& other) const;
+    PhysicalRegion __get_physical_region() const;
 };
 template <unsigned int DIM>
 class LogicalRegionT : public LogicalRegion {
 public:
     LogicalRegionT(const LogicalRegion& rhs);
 };
+class SinglePointLogicalRegion : public LogicalRegion {
+public:
+    DomainPoint point;
+
+    SinglePointLogicalRegion(RegionID _id, DomainPoint _point);
+    bool operator==(const SinglePointLogicalRegion& other) const;
+    PhysicalRegion __get_physical_region() const;
+};
 class LogicalPartition {
 public:
     LogicalRegion region;
+    IndexPartition partition;
 
-    LogicalPartition(LogicalRegion _region);
+    LogicalPartition(LogicalRegion _region, IndexPartition _partition);
 };
 
 class RegionRequirement {
@@ -153,6 +168,14 @@ public:
 
     PhysicalRegion(RegionID _id);
     size_t get_index(const DomainPoint& p) const;
+};
+class SinglePointPhysicalRegion : public PhysicalRegion {
+public:
+    DomainPoint point;
+    size_t index;
+
+    SinglePointPhysicalRegion(RegionID _id, DomainPoint _point);
+    size_t get_index(const DomainPoint& point) const;
 };
 
 template <PrivilegeMode MODE, typename FT, int N>
