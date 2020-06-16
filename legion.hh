@@ -123,6 +123,22 @@ public:
     FieldID allocate_field(size_t field_size, FieldID desired_fieldid);
 };
 
+class PhysicalRegion {
+public:
+    RegionID id;
+
+    PhysicalRegion(RegionID _id);
+    size_t get_index(const DomainPoint& p) const;
+};
+class SinglePointPhysicalRegion : public PhysicalRegion {
+public:
+    DomainPoint point;
+    size_t index;
+
+    SinglePointPhysicalRegion(RegionID _id, DomainPoint _point);
+    size_t get_index(const DomainPoint& point) const;
+};
+
 class LogicalRegion {
 public:
     RegionID id;
@@ -160,22 +176,6 @@ public:
     RegionRequirement(LogicalRegion _handle, PrivilegeMode _priv,
                       CoherenceProperty _prop, LogicalRegion _parent);
     RegionRequirement& add_field(FieldID fid);
-};
-
-class PhysicalRegion {
-public:
-    RegionID id;
-
-    PhysicalRegion(RegionID _id);
-    size_t get_index(const DomainPoint& p) const;
-};
-class SinglePointPhysicalRegion : public PhysicalRegion {
-public:
-    DomainPoint point;
-    size_t index;
-
-    SinglePointPhysicalRegion(RegionID _id, DomainPoint _point);
-    size_t get_index(const DomainPoint& point) const;
 };
 
 template <PrivilegeMode MODE, typename FT, int N>
