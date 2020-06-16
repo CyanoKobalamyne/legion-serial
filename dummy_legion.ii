@@ -109,8 +109,6 @@ bool IndexSpace::operator==(const IndexSpace& other) const {
 size_t IndexSpace::size() const { return dom.size(); }
 template <unsigned int DIM>
 IndexSpaceT<DIM>::IndexSpaceT(const IndexSpace& rhs) : IndexSpace(rhs.dom) {}
-IndexPartition::IndexPartition(bool is_single_point)
-    : single_point(is_single_point) {}
 
 FieldSpace::FieldSpace(FieldSpaceID fsid) : id(fsid) {}
 bool FieldSpace::operator==(const FieldSpace& other) const {
@@ -128,25 +126,10 @@ LogicalRegion::LogicalRegion(RegionID _id) : id(_id) {}
 bool LogicalRegion::operator==(const LogicalRegion& other) const {
     return id == other.id;
 }
-PhysicalRegion LogicalRegion::__get_physical_region() const {
-    return PhysicalRegion(id);
-}
 template <unsigned int DIM>
 LogicalRegionT<DIM>::LogicalRegionT(const LogicalRegion& rhs)
     : LogicalRegion(rhs.id) {}
-LogicalPartition::LogicalPartition(LogicalRegion _region,
-                                   IndexPartition _partition)
-    : region(_region), partition(_partition) {}
-SinglePointLogicalRegion::SinglePointLogicalRegion(RegionID _id,
-                                                   DomainPoint _point)
-    : LogicalRegion(_id), point(_point) {}
-bool SinglePointLogicalRegion::operator==(
-    const SinglePointLogicalRegion& other) const {
-    return LogicalRegion::operator==(other) && point == other.point;
-}
-PhysicalRegion SinglePointLogicalRegion::__get_physical_region() const {
-    return SinglePointPhysicalRegion(id, point);
-}
+LogicalPartition::LogicalPartition(LogicalRegion _region) : region(_region) {}
 
 RegionRequirement::RegionRequirement(LogicalRegion _handle,
                                      PrivilegeMode _priv,
@@ -159,28 +142,6 @@ RegionRequirement& RegionRequirement::add_field(FieldID fid) {
 }
 
 PhysicalRegion::PhysicalRegion(RegionID _id) : id(_id) {}
-size_t PhysicalRegion::get_index(const DomainPoint& p) const {
-    Domain dom = Runtime::logical_regions.at(id).first.dom;
-    size_t index = 0;
-    size_t dim_prod = 1;
-    for (unsigned int dim = 0; dim < p.coords.size(); dim++) {
-        index += p[dim] * dim_prod;
-        dim_prod *= dom.hi[dim] - dom.lo[dim] + 1;
-    }
-    return index;
-}
-SinglePointPhysicalRegion::SinglePointPhysicalRegion(RegionID _id,
-                                                     DomainPoint _point)
-    : PhysicalRegion(_id), point(_point), index(0) {
-    index = PhysicalRegion::get_index(point);
-}
-size_t SinglePointPhysicalRegion::get_index(const DomainPoint& p) const {
-    if (p == point) {
-        return index;
-    } else {
-        return PhysicalRegion::get_index(p);
-    }
-}
 
 template <PrivilegeMode MODE, typename FT, int N>
 FieldAccessor<MODE, FT, N>::FieldAccessor(const PhysicalRegion& region,
@@ -188,7 +149,13 @@ FieldAccessor<MODE, FT, N>::FieldAccessor(const PhysicalRegion& region,
     : store(region), field(fid) {}
 template <PrivilegeMode MODE, typename FT, int N>
 FT& FieldAccessor<MODE, FT, N>::operator[](const Point<N>& p) const {
-    size_t index = store.get_index(p);
+    Domain dom = Runtime::logical_regions.at(store.id).first.dom;
+    size_t index = 0;
+    size_t dim_prod = 1;
+    for (unsigned int dim = 0; dim < p.coords.size(); dim++) {
+        index += p[dim] * dim_prod;
+        dim_prod *= dom.hi[dim] - dom.lo[dim] + 1;
+    }
     uint8_t* base = static_cast<uint8_t*>(
         Runtime::physical_regions.at(store.id).at(field));
     size_t fsize = Runtime::field_spaces
@@ -267,7 +234,7 @@ IndexSpace Runtime::create_index_space(Context ctx, const Domain& bounds) {
 }
 IndexPartition Runtime::create_equal_partition(Context ctx, IndexSpace parent,
                                                IndexSpace color_space) {
-    return IndexPartition(parent == color_space);
+    return IndexPartition();
 }
 FieldSpace Runtime::create_field_space(Context ctx) {
     field_spaces.emplace_back();
@@ -296,21 +263,17 @@ PhysicalRegion Runtime::map_region(Context ctx,
 void Runtime::unmap_region(Context ctx, PhysicalRegion region) {}
 LogicalPartition Runtime::get_logical_partition(LogicalRegion parent,
                                                 IndexPartition handle) {
-    return LogicalPartition(parent, handle);
+    return LogicalPartition(parent);
 }
 LogicalRegion Runtime::get_logical_subregion_by_color(LogicalPartition parent,
                                                       const DomainPoint& c) {
-    if (parent.partition.single_point) {
-        return SinglePointLogicalRegion(parent.region.id, c);
-    } else {
-        return parent.region;
-    }
+    return parent.region;
 }
 Future Runtime::execute_task(Context ctx, const TaskLauncher& launcher) {
     Task task(launcher._arg);
     std::vector<PhysicalRegion> regions;
     for (auto req : launcher.reqs) {
-        regions.push_back(req.region.__get_physical_region());
+        regions.push_back(PhysicalRegion(req.region.id));
     }
     Future fut(tasks.at(launcher._tid)->run(&task, regions, ctx, this));
     futures.push_back(fut);

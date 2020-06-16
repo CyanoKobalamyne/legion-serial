@@ -101,12 +101,7 @@ class IndexSpaceT : public IndexSpace {
 public:
     IndexSpaceT(const IndexSpace& rhs);
 };
-class IndexPartition {
-public:
-    bool single_point = false;
-
-    IndexPartition(bool is_single_point = false);
-};
+class IndexPartition {};
 
 class FieldSpace {
 public:
@@ -123,49 +118,23 @@ public:
     FieldID allocate_field(size_t field_size, FieldID desired_fieldid);
 };
 
-class PhysicalRegion {
-public:
-    RegionID id;
-
-    PhysicalRegion(RegionID _id);
-    size_t get_index(const DomainPoint& p) const;
-};
-class SinglePointPhysicalRegion : public PhysicalRegion {
-public:
-    DomainPoint point;
-    size_t index;
-
-    SinglePointPhysicalRegion(RegionID _id, DomainPoint _point);
-    size_t get_index(const DomainPoint& point) const;
-};
-
 class LogicalRegion {
 public:
     RegionID id;
 
     LogicalRegion(RegionID _id);
     bool operator==(const LogicalRegion& other) const;
-    PhysicalRegion __get_physical_region() const;
 };
 template <unsigned int DIM>
 class LogicalRegionT : public LogicalRegion {
 public:
     LogicalRegionT(const LogicalRegion& rhs);
 };
-class SinglePointLogicalRegion : public LogicalRegion {
-public:
-    DomainPoint point;
-
-    SinglePointLogicalRegion(RegionID _id, DomainPoint _point);
-    bool operator==(const SinglePointLogicalRegion& other) const;
-    PhysicalRegion __get_physical_region() const;
-};
 class LogicalPartition {
 public:
     LogicalRegion region;
-    IndexPartition partition;
 
-    LogicalPartition(LogicalRegion _region, IndexPartition _partition);
+    LogicalPartition(LogicalRegion _region);
 };
 
 class RegionRequirement {
@@ -176,6 +145,13 @@ public:
     RegionRequirement(LogicalRegion _handle, PrivilegeMode _priv,
                       CoherenceProperty _prop, LogicalRegion _parent);
     RegionRequirement& add_field(FieldID fid);
+};
+
+class PhysicalRegion {
+public:
+    RegionID id;
+
+    PhysicalRegion(RegionID _id);
 };
 
 template <PrivilegeMode MODE, typename FT, int N>
