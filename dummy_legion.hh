@@ -1,5 +1,5 @@
-#ifndef LEGION_HH_
-#define LEGION_HH_
+#ifndef DUMMY_LEGION_HH_
+#define DUMMY_LEGION_HH_
 
 #include <cstddef>
 #include <functional>
@@ -302,4 +302,4 @@ public:
 
 #include "dummy_legion.ii"
 
-#endif  // LEGION_HH_
+#endif  // DUMMY_LEGION_HH_
