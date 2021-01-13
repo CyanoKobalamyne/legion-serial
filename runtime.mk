@@ -6,6 +6,10 @@ ifndef OUTFILE
 $(error OUTFILE not defined, nothing to build)
 endif
 
+ifndef LG_RT_DIR
+$(error LG_RT_DIR variable is not defined, aborting build)
+endif
+
 # These flags are used to control compiler/linker settings.
 CFLAGS		?=
 CC_FLAGS	?=
@@ -28,7 +32,7 @@ CFLAGS		+= -march=${MARCH}
 CC_FLAGS	+= -march=${MARCH}
 
 # Include paths.
-INC_FLAGS	+= -I$(CURDIR)
+INC_FLAGS	+= -I$(LG_RT_DIR)
 
 # Figure out OS.
 ifeq ($(shell uname -s),Linux)
