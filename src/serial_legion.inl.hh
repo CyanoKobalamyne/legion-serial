@@ -52,12 +52,14 @@ DomainPoint::DomainPoint(const Point<DIM>& rhs) {
         coords.push_back(rhs[i]);
     }
 }
-DomainPoint::DomainPoint(coord_t coord) { coords.push_back(coord); }
-bool DomainPoint::operator==(const DomainPoint& other) const {
+inline DomainPoint::DomainPoint(coord_t coord) { coords.push_back(coord); }
+inline bool DomainPoint::operator==(const DomainPoint& other) const {
     return coords == other.coords;
 }
-coord_t& DomainPoint::operator[](unsigned int ix) { return coords.at(ix); }
-const coord_t& DomainPoint::operator[](unsigned int ix) const {
+inline coord_t& DomainPoint::operator[](unsigned int ix) {
+    return coords.at(ix);
+}
+inline const coord_t& DomainPoint::operator[](unsigned int ix) const {
     return coords.at(ix);
 }
 
@@ -66,10 +68,10 @@ Rect<DIM, T>::Rect(Point<DIM, T> lo_, Point<DIM, T> hi_) : lo(lo_), hi(hi_) {}
 
 template <unsigned int DIM, typename T>
 Domain::Domain(const Rect<DIM, T>& other) : lo(other.lo), hi(other.hi) {}
-bool Domain::operator==(const Domain& other) const {
+inline bool Domain::operator==(const Domain& other) const {
     return lo == other.lo && hi == other.hi;
 }
-size_t Domain::size() const {
+inline size_t Domain::size() const {
     size_t size = 1;
     for (unsigned int i = 0; i < lo.coords.size(); i++) {
         size *= hi.coords.at(i) - lo.coords.at(i) + 1;
@@ -116,46 +118,47 @@ PointInRectIterator<DIM, T> PointInRectIterator<DIM, T>::operator++(int) {
 
 /* Memory structures. */
 
-IndexSpace::IndexSpace(Domain _dom) : dom(_dom) {}
-bool IndexSpace::operator==(const IndexSpace& other) const {
+inline IndexSpace::IndexSpace(Domain _dom) : dom(_dom) {}
+inline bool IndexSpace::operator==(const IndexSpace& other) const {
     return dom == other.dom;
 }
-size_t IndexSpace::size() const { return dom.size(); }
+inline size_t IndexSpace::size() const { return dom.size(); }
 template <unsigned int DIM>
 IndexSpaceT<DIM>::IndexSpaceT(const IndexSpace& rhs) : IndexSpace(rhs.dom) {}
 
-FieldSpace::FieldSpace(FieldSpaceID fsid) : id(fsid) {}
-bool FieldSpace::operator==(const FieldSpace& other) const {
+inline FieldSpace::FieldSpace(FieldSpaceID fsid) : id(fsid) {}
+inline bool FieldSpace::operator==(const FieldSpace& other) const {
     return id == other.id;
 }
 
-FieldAllocator::FieldAllocator(FieldSpaceID _id) : id(_id) {}
-FieldID FieldAllocator::allocate_field(size_t field_size,
-                                       FieldID desired_fieldid) {
+inline FieldAllocator::FieldAllocator(FieldSpaceID _id) : id(_id) {}
+inline FieldID FieldAllocator::allocate_field(size_t field_size,
+                                              FieldID desired_fieldid) {
     Runtime::field_spaces.at(id).insert_or_assign(desired_fieldid, field_size);
     return desired_fieldid;
 }
 
-LogicalRegion::LogicalRegion(RegionID _id) : id(_id) {}
-bool LogicalRegion::operator==(const LogicalRegion& other) const {
+inline LogicalRegion::LogicalRegion(RegionID _id) : id(_id) {}
+inline bool LogicalRegion::operator==(const LogicalRegion& other) const {
     return id == other.id;
 }
 template <unsigned int DIM>
 LogicalRegionT<DIM>::LogicalRegionT(const LogicalRegion& rhs)
     : LogicalRegion(rhs.id) {}
-LogicalPartition::LogicalPartition(LogicalRegion _region) : region(_region) {}
+inline LogicalPartition::LogicalPartition(LogicalRegion _region)
+    : region(_region) {}
 
-RegionRequirement::RegionRequirement(LogicalRegion _handle,
-                                     PrivilegeMode _priv,
-                                     CoherenceProperty _prop,
-                                     LogicalRegion _parent)
+inline RegionRequirement::RegionRequirement(LogicalRegion _handle,
+                                            PrivilegeMode _priv,
+                                            CoherenceProperty _prop,
+                                            LogicalRegion _parent)
     : region(_handle) {}
-RegionRequirement& RegionRequirement::add_field(FieldID fid) {
+inline RegionRequirement& RegionRequirement::add_field(FieldID fid) {
     field_ids.push_back(fid);
     return *this;
 }
 
-PhysicalRegion::PhysicalRegion(RegionID _id) : id(_id) {}
+inline PhysicalRegion::PhysicalRegion(RegionID _id) : id(_id) {}
 
 template <PrivilegeMode MODE, typename FT, int N>
 FieldAccessor<MODE, FT, N>::FieldAccessor(const PhysicalRegion& region,
@@ -180,48 +183,49 @@ FT& FieldAccessor<MODE, FT, N>::operator[](const Point<N>& p) const {
 
 /* Runtime types and classes. */
 
-Future::Future(void* _res) : res(_res) {}
+inline Future::Future(void* _res) : res(_res) {}
 template <typename T>
 T Future::get_result() const {
     return *(T*)res;
 }
-bool Future::is_ready() const { return true; }
+inline bool Future::is_ready() const { return true; }
 
-ProcessorConstraint::ProcessorConstraint(Processor::Kind kind) {}
+inline ProcessorConstraint::ProcessorConstraint(Processor::Kind kind) {}
 
-TaskArgument::TaskArgument(const void* arg, size_t argsize)
+inline TaskArgument::TaskArgument(const void* arg, size_t argsize)
     : _arg(arg), _argsize(argsize) {}
-Task::Task(TaskArgument ta) {
+inline Task::Task(TaskArgument ta) {
     args = std::malloc(ta._argsize);
     memcpy(args, ta._arg, ta._argsize);
 }
-Task::~Task() { std::free(args); }
-TaskLauncher::TaskLauncher(TaskID tid, TaskArgument arg)
+inline Task::~Task() { std::free(args); }
+inline TaskLauncher::TaskLauncher(TaskID tid, TaskArgument arg)
     : _tid(tid), _arg(arg) {}
-RegionRequirement& TaskLauncher::add_region_requirement(
+inline RegionRequirement& TaskLauncher::add_region_requirement(
     const RegionRequirement& req) {
     reqs.push_back(req);
     return reqs.at(reqs.size() - 1);
 }
-void TaskLauncher::add_field(unsigned int idx, FieldID fid) {
+inline void TaskLauncher::add_field(unsigned int idx, FieldID fid) {
     reqs.at(idx).add_field(fid);
 }
 
-TaskVariantRegistrar::TaskVariantRegistrar(TaskID task_id,
-                                           const char* variant_name)
+inline TaskVariantRegistrar::TaskVariantRegistrar(TaskID task_id,
+                                                  const char* variant_name)
     : id(task_id) {}
-TaskVariantRegistrar& TaskVariantRegistrar::add_constraint(
+inline TaskVariantRegistrar& TaskVariantRegistrar::add_constraint(
     const ProcessorConstraint& constraint) {
     return *this;
 }
 
-InlineLauncher::InlineLauncher(const RegionRequirement& req) : _req(req) {}
+inline InlineLauncher::InlineLauncher(const RegionRequirement& req)
+    : _req(req) {}
 
-InputArgs Runtime::get_input_args() { return input_args; }
-void Runtime::set_top_level_task_id(TaskID top_id) {
+inline InputArgs Runtime::get_input_args() { return input_args; }
+inline void Runtime::set_top_level_task_id(TaskID top_id) {
     top_level_task_id = top_id;
 }
-int Runtime::start(int argc, char** argv) {
+inline int Runtime::start(int argc, char** argv) {
     input_args = {.argc = argc, .argv = argv};
     Task task(TaskArgument(nullptr, 0));
     Runtime rt;
@@ -243,27 +247,32 @@ int Runtime::start(int argc, char** argv) {
 
     return 0;
 }
-IndexSpace Runtime::create_index_space(Context ctx, const Domain& bounds) {
+inline IndexSpace Runtime::create_index_space(Context ctx,
+                                              const Domain& bounds) {
     return IndexSpace(bounds);
 }
-void Runtime::destroy_index_space(Context ctx, IndexSpace handle) { return; }
-IndexPartition Runtime::create_equal_partition(Context ctx, IndexSpace parent,
-                                               IndexSpace color_space) {
+inline void Runtime::destroy_index_space(Context ctx, IndexSpace handle) {
+    return;
+}
+inline IndexPartition Runtime::create_equal_partition(Context ctx,
+                                                      IndexSpace parent,
+                                                      IndexSpace color_space) {
     return IndexPartition();
 }
-FieldSpace Runtime::create_field_space(Context ctx) {
+inline FieldSpace Runtime::create_field_space(Context ctx) {
     field_spaces.emplace_back();
     return FieldSpace(field_spaces.size() - 1);
 }
-void Runtime::destroy_field_space(Context ctx, FieldSpace handle) {
+inline void Runtime::destroy_field_space(Context ctx, FieldSpace handle) {
     field_spaces.erase(field_spaces.begin() + handle.id);
 }
-FieldAllocator Runtime::create_field_allocator(Context ctx,
-                                               FieldSpace handle) {
+inline FieldAllocator Runtime::create_field_allocator(Context ctx,
+                                                      FieldSpace handle) {
     return FieldAllocator(handle.id);
 }
-LogicalRegion Runtime::create_logical_region(Context ctx, IndexSpace index,
-                                             FieldSpace fields) {
+inline LogicalRegion Runtime::create_logical_region(Context ctx,
+                                                    IndexSpace index,
+                                                    FieldSpace fields) {
     RegionID id = logical_regions.size();
     logical_regions.push_back(std::make_pair(index, fields));
     // Allocate storage space.
@@ -274,23 +283,25 @@ LogicalRegion Runtime::create_logical_region(Context ctx, IndexSpace index,
     }
     return LogicalRegion(id);
 }
-void Runtime::destroy_logical_region(Context ctx, LogicalRegion handle) {
+inline void Runtime::destroy_logical_region(Context ctx,
+                                            LogicalRegion handle) {
     logical_regions.erase(logical_regions.begin() + handle.id);
 }
-PhysicalRegion Runtime::map_region(Context ctx,
-                                   const InlineLauncher& launcher) {
+inline PhysicalRegion Runtime::map_region(Context ctx,
+                                          const InlineLauncher& launcher) {
     return PhysicalRegion(launcher._req.region.id);
 }
-void Runtime::unmap_region(Context ctx, PhysicalRegion region) {}
-LogicalPartition Runtime::get_logical_partition(LogicalRegion parent,
-                                                IndexPartition handle) {
+inline void Runtime::unmap_region(Context ctx, PhysicalRegion region) {}
+inline LogicalPartition Runtime::get_logical_partition(LogicalRegion parent,
+                                                       IndexPartition handle) {
     return LogicalPartition(parent);
 }
-LogicalRegion Runtime::get_logical_subregion_by_color(LogicalPartition parent,
-                                                      const DomainPoint& c) {
+inline LogicalRegion Runtime::get_logical_subregion_by_color(
+    LogicalPartition parent, const DomainPoint& c) {
     return parent.region;
 }
-Future Runtime::execute_task(Context ctx, const TaskLauncher& launcher) {
+inline Future Runtime::execute_task(Context ctx,
+                                    const TaskLauncher& launcher) {
     Task task(launcher._arg);
     std::vector<PhysicalRegion> regions;
     for (auto req : launcher.reqs) {
@@ -315,12 +326,12 @@ VariantID Runtime::preregister_task_variant(
     tasks.insert_or_assign(registrar.id, new RuntimeHelperT<void, TASK_PTR>);
     return registrar.id;
 }
-void* RuntimeHelper::run(const Task* task,
-                         const std::vector<PhysicalRegion>& regions,
-                         Context ctx, Runtime* rt) {
+inline void* RuntimeHelper::run(const Task* task,
+                                const std::vector<PhysicalRegion>& regions,
+                                Context ctx, Runtime* rt) {
     return nullptr;
 }
-RuntimeHelper::~RuntimeHelper() {}
+inline RuntimeHelper::~RuntimeHelper() {}
 template <typename T,
           T (*TASK_PTR)(const Task*, const std::vector<PhysicalRegion>&,
                         Context, Runtime*)>
