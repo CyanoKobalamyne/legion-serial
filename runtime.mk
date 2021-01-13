@@ -66,6 +66,13 @@ CC_FLAGS	+= -fsanitize=thread -g -DTSAN_ENABLED
 LD_FLAGS	+= -fsanitize=thread
 endif
 
+# DEBUG_ASAN=1 enables address sanitizer (memory error) checks.
+ifeq ($(strip $(DEBUG_ASAN)),1)
+CFLAGS		+= -fsanitize=address -g -DASAN_ENABLED
+CC_FLAGS	+= -fsanitize=address -g -DASAN_ENABLED
+LD_FLAGS	+= -fsanitize=address
+endif
+
 # Demand warning-free compilation.
 CFLAGS		+= -Wall
 CC_FLAGS	+= -Wall
