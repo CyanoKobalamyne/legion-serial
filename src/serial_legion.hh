@@ -2,9 +2,7 @@
 #define SERIAL_LEGION_HH_
 
 #include <cstddef>
-#include <functional>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 enum legion_privilege_mode_t {
@@ -165,9 +163,36 @@ public:
     FT& operator[](const Point<N>& p) const;
 };
 
+namespace impl {
+
+    class FieldSpaceImpl {
+    public:
+        std::unordered_map<FieldID, size_t> field_sizes;
+    };
+
+    class LogicalRegionImpl {
+    public:
+        IndexSpace index_space;
+        FieldSpace field_space;
+
+        LogicalRegionImpl(IndexSpace ispace, FieldSpace fspace);
+    };
+
+    class PhysicalRegionImpl {
+    public:
+        std::unordered_map<FieldID, void*> fields;
+    };
+
+}  // namespace impl
+
 /* Runtime types and classes. */
 
-class Context {};
+class Context {
+public:
+    inline static std::vector<impl::FieldSpaceImpl> field_spaces;
+    inline static std::vector<impl::LogicalRegionImpl> logical_regions;
+    inline static std::vector<impl::PhysicalRegionImpl> physical_regions;
+};
 
 class Future {
 public:
@@ -238,18 +263,13 @@ struct InputArgs {
 
 class RuntimeHelper;
 class Runtime {
-public:
+private:
     inline static InputArgs input_args;
     inline static TaskID top_level_task_id;
     inline static std::unordered_map<VariantID, RuntimeHelper*> tasks;
-    inline static std::vector<std::unordered_map<FieldID, size_t>>
-        field_spaces;
-    inline static std::vector<std::pair<IndexSpace, FieldSpace>>
-        logical_regions;
-    inline static std::vector<std::unordered_map<FieldID, void*>>
-        physical_regions;
     inline static std::vector<Future> futures;
 
+public:
     static InputArgs get_input_args();
     static void set_top_level_task_id(TaskID top_id);
     static int start(int argc, char** argv);

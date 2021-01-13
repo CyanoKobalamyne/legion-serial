@@ -9,7 +9,6 @@
 #include <cstring>
 #include <stdexcept>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include "serial_legion.hh"
@@ -134,7 +133,8 @@ inline bool FieldSpace::operator==(const FieldSpace& other) const {
 inline FieldAllocator::FieldAllocator(FieldSpaceID _id) : id(_id) {}
 inline FieldID FieldAllocator::allocate_field(size_t field_size,
                                               FieldID desired_fieldid) {
-    Runtime::field_spaces.at(id).insert_or_assign(desired_fieldid, field_size);
+    Context::field_spaces.at(id).field_sizes.insert_or_assign(desired_fieldid,
+                                                              field_size);
     return desired_fieldid;
 }
 
@@ -166,7 +166,7 @@ FieldAccessor<MODE, FT, N>::FieldAccessor(const PhysicalRegion& region,
     : store(region), field(fid) {}
 template <PrivilegeMode MODE, typename FT, int N>
 FT& FieldAccessor<MODE, FT, N>::operator[](const Point<N>& p) const {
-    Domain dom = Runtime::logical_regions.at(store.id).first.dom;
+    Domain dom = Context::logical_regions.at(store.id).index_space.dom;
     size_t index = 0;
     size_t dim_prod = 1;
     for (unsigned int dim = 0; dim < p.coords.size(); dim++) {
@@ -174,12 +174,15 @@ FT& FieldAccessor<MODE, FT, N>::operator[](const Point<N>& p) const {
         dim_prod *= dom.hi[dim] - dom.lo[dim] + 1;
     }
     uint8_t* base = static_cast<uint8_t*>(
-        Runtime::physical_regions.at(store.id).at(field));
-    size_t fsize = Runtime::field_spaces
-                       .at(Runtime::logical_regions.at(store.id).second.id)
-                       .at(field);
+        Context::physical_regions.at(store.id).fields.at(field));
+    FieldSpaceID fsid = Context::logical_regions.at(store.id).field_space.id;
+    size_t fsize = Context::field_spaces.at(fsid).field_sizes.at(field);
     return *(FT*)(base + index * fsize);
 }
+
+inline impl::LogicalRegionImpl::LogicalRegionImpl(IndexSpace ispace,
+                                                  FieldSpace fspace)
+    : index_space(ispace), field_space(fspace) {}
 
 /* Runtime types and classes. */
 
@@ -239,8 +242,8 @@ inline int Runtime::start(int argc, char** argv) {
     for (auto task : tasks) {
         delete task.second;
     }
-    for (auto region : physical_regions) {
-        for (auto field : region) {
+    for (auto region : Context::physical_regions) {
+        for (auto field : region.fields) {
             std::free(field.second);
         }
     }
@@ -260,11 +263,11 @@ inline IndexPartition Runtime::create_equal_partition(Context ctx,
     return IndexPartition();
 }
 inline FieldSpace Runtime::create_field_space(Context ctx) {
-    field_spaces.emplace_back();
-    return FieldSpace(field_spaces.size() - 1);
+    Context::field_spaces.emplace_back();
+    return FieldSpace(Context::field_spaces.size() - 1);
 }
 inline void Runtime::destroy_field_space(Context ctx, FieldSpace handle) {
-    field_spaces.erase(field_spaces.begin() + handle.id);
+    Context::field_spaces.erase(Context::field_spaces.begin() + handle.id);
 }
 inline FieldAllocator Runtime::create_field_allocator(Context ctx,
                                                       FieldSpace handle) {
@@ -273,19 +276,20 @@ inline FieldAllocator Runtime::create_field_allocator(Context ctx,
 inline LogicalRegion Runtime::create_logical_region(Context ctx,
                                                     IndexSpace index,
                                                     FieldSpace fields) {
-    RegionID id = logical_regions.size();
-    logical_regions.push_back(std::make_pair(index, fields));
+    RegionID id = Context::logical_regions.size();
+    Context::logical_regions.push_back(impl::LogicalRegionImpl(index, fields));
     // Allocate storage space.
-    physical_regions.emplace_back();
-    for (auto field : field_spaces.at(fields.id)) {
-        physical_regions.at(id).insert_or_assign(
+    Context::physical_regions.emplace_back();
+    for (auto field : Context::field_spaces.at(fields.id).field_sizes) {
+        Context::physical_regions.at(id).fields.insert_or_assign(
             field.first, std::malloc(field.second * index.size()));
     }
     return LogicalRegion(id);
 }
 inline void Runtime::destroy_logical_region(Context ctx,
                                             LogicalRegion handle) {
-    logical_regions.erase(logical_regions.begin() + handle.id);
+    Context::logical_regions.erase(Context::logical_regions.begin() +
+                                   handle.id);
 }
 inline PhysicalRegion Runtime::map_region(Context ctx,
                                           const InlineLauncher& launcher) {
