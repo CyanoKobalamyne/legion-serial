@@ -254,12 +254,15 @@ public:
     static void set_top_level_task_id(TaskID top_id);
     static int start(int argc, char** argv);
     IndexSpace create_index_space(Context ctx, const Domain& bounds);
+    void destroy_index_space(Context ctx, IndexSpace handle);
     IndexPartition create_equal_partition(Context ctx, IndexSpace parent,
                                           IndexSpace color_space);
     FieldSpace create_field_space(Context ctx);
+    void destroy_field_space(Context ctx, FieldSpace handle);
     FieldAllocator create_field_allocator(Context ctx, FieldSpace handle);
     LogicalRegion create_logical_region(Context ctx, IndexSpace index,
                                         FieldSpace fields);
+    void destroy_logical_region(Context ctx, LogicalRegion handle);
     PhysicalRegion map_region(Context ctx, const InlineLauncher& launcher);
     void unmap_region(Context ctx, PhysicalRegion region);
     LogicalPartition get_logical_partition(LogicalRegion parent,

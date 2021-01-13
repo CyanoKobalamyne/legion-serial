@@ -242,6 +242,7 @@ int Runtime::start(int argc, char** argv) {
 IndexSpace Runtime::create_index_space(Context ctx, const Domain& bounds) {
     return IndexSpace(bounds);
 }
+void Runtime::destroy_index_space(Context ctx, IndexSpace handle) { return; }
 IndexPartition Runtime::create_equal_partition(Context ctx, IndexSpace parent,
                                                IndexSpace color_space) {
     return IndexPartition();
@@ -249,6 +250,9 @@ IndexPartition Runtime::create_equal_partition(Context ctx, IndexSpace parent,
 FieldSpace Runtime::create_field_space(Context ctx) {
     field_spaces.emplace_back();
     return FieldSpace(field_spaces.size() - 1);
+}
+void Runtime::destroy_field_space(Context ctx, FieldSpace handle) {
+    field_spaces.erase(field_spaces.begin() + handle.id);
 }
 FieldAllocator Runtime::create_field_allocator(Context ctx,
                                                FieldSpace handle) {
@@ -265,6 +269,9 @@ LogicalRegion Runtime::create_logical_region(Context ctx, IndexSpace index,
             field.first, std::malloc(field.second * index.size()));
     }
     return LogicalRegion(id);
+}
+void Runtime::destroy_logical_region(Context ctx, LogicalRegion handle) {
+    logical_regions.erase(logical_regions.begin() + handle.id);
 }
 PhysicalRegion Runtime::map_region(Context ctx,
                                    const InlineLauncher& launcher) {
