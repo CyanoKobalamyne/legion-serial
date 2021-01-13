@@ -1,3 +1,7 @@
+/* Template and inline function definitions. */
+#ifndef SERIAL_LEGION_INL_HH_
+#define SERIAL_LEGION_INL_HH_
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -338,3 +342,5 @@ void* RuntimeHelperT<void, TASK_PTR>::run(
 }
 
 }  // namespace Legion
+
+#endif  // SERIAL_LEGION_INL_HH_

@@ -304,6 +304,4 @@ public:
 };
 }  // namespace Legion
 
-#include "serial_legion.ii"
-
 #endif  // SERIAL_LEGION_HH_
