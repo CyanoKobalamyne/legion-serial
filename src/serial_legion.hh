@@ -1,5 +1,5 @@
-#ifndef DUMMY_LEGION_HH_
-#define DUMMY_LEGION_HH_
+#ifndef SERIAL_LEGION_HH_
+#define SERIAL_LEGION_HH_
 
 #include <cstddef>
 #include <functional>
@@ -300,6 +300,6 @@ public:
 };
 }  // namespace Legion
 
-#include "dummy_legion.ii"
+#include "serial_legion.ii"
 
-#endif  // DUMMY_LEGION_HH_
+#endif  // SERIAL_LEGION_HH_

@@ -1,2 +1,2 @@
 /* Wrapper header for Legion implementation. */
-#include "dummy_legion.hh"
+#include "src/serial_legion.hh"

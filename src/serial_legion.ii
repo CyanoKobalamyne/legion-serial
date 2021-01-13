@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "dummy_legion.hh"
+#include "serial_legion.hh"
 
 namespace Legion {
 
