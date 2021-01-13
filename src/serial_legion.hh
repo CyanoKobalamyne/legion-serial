@@ -42,6 +42,7 @@ public:
 
     T& operator[](unsigned int ix);
     const T& operator[](unsigned int ix) const;
+    operator T() const;
 };
 class DomainPoint {
 public:

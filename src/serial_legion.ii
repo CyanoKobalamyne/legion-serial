@@ -32,6 +32,16 @@ const T& Point<DIM, T>::operator[](unsigned int ix) const {
     return coords.at(ix);
 }
 
+template <unsigned int DIM, typename T>
+Point<DIM, T>::operator T() const {
+    if (coords.size() == 1) {
+        return coords.at(0);
+    } else {
+        throw std::logic_error(
+            "cannot to cast multi-dimensional point to value type");
+    }
+}
+
 template <unsigned int DIM>
 DomainPoint::DomainPoint(const Point<DIM>& rhs) {
     for (size_t i = 0; i < DIM; i++) {
