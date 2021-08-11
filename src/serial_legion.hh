@@ -199,6 +199,7 @@ public:
     void* res = nullptr;
 
     Future(void* _res);
+    void get_void_result() const;
     template <typename T>
     T get_result() const;
     bool is_ready() const;

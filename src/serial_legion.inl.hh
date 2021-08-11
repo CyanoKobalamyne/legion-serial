@@ -187,6 +187,7 @@ inline impl::LogicalRegionImpl::LogicalRegionImpl(IndexSpace ispace,
 /* Runtime types and classes. */
 
 inline Future::Future(void* _res) : res(_res) {}
+inline void Future::get_void_result() const {}
 template <typename T>
 T Future::get_result() const {
     return *(T*)res;
